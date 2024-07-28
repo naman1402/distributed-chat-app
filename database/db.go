@@ -7,10 +7,10 @@ import (
 )
 
 type DatabaseConnection struct {
-	session *gocql.Session
+	Session *gocql.Session
 }
 
-var connection DatabaseConnection
+var Connection DatabaseConnection
 
 func SetupConnection() {
 
@@ -18,17 +18,32 @@ func SetupConnection() {
 	cluster.Keyspace = "chat"
 	cluster.Consistency = gocql.Quorum
 	cs, err := cluster.CreateSession()
-	connection.session = cs
+	Connection.Session = cs
 	if err != nil {
 		fmt.Println("database error")
 		panic(err)
 	}
 }
 
-func ExecuteQuery() error {
-	return nil
+func ExecuteQuery(query string, args ...interface{}) error {
+	err := Connection.Session.Query(query, args...).Exec()
+	return err
 }
 
-func SelectQuery() error {
-	return nil
+func SelectQuery(query string, args ...interface{}) *gocql.Query {
+	data := Connection.Session.Query(query, args...)
+	return data
+}
+
+func CheckIfExist(query string, id string) (string, string) {
+	var ID string
+	var username string
+	m := map[string]interface{}{}
+	iter := Connection.Session.Query(query, id).Iter()
+	for iter.MapScan(m) {
+		ID = m["id"].(string)
+		username = m["username"].(string)
+		m = map[string]interface{}{}
+	}
+	return ID, username
 }
