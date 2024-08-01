@@ -53,3 +53,9 @@ func GetServerId(userid string) string {
 	iter.Scan(&serverid)
 	return serverid
 }
+
+func CheckIfUserExist(userId string) (string, string) {
+	query := `SELECT id,username FROM users WHERE username = ?`
+	ID, username := database.CheckIfExist(query, userId)
+	return ID, username
+}

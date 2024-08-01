@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"github.com/naman1402/distributed-chat-app/router"
+)
 
 func main() {
-	fmt.Println("Hello")
+	router.Start()
 }
