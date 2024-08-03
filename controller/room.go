@@ -30,3 +30,14 @@ func JoinRoom(c *gin.Context) {
 	database.ExecuteQuery(query, joiningRoom.Name, joiningRoom.User)
 	c.JSON(http.StatusOK, gin.H{"message": "room joined"})
 }
+
+func GetMembersFromRoom(groupname string) []string {
+	var username string
+	members := []string{}
+	query := `SELECT username FROM room_members WHERE room_name = ?`
+	data := database.Connection.Session.Query(query, groupname).Iter()
+	for data.Scan(&username) {
+		members = append(members, username)
+	}
+	return members
+}
