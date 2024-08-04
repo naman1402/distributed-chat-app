@@ -123,7 +123,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 					return
 				}
 				fmt.Println("redis key ", key)
-				// Conn.publish(Ctx, key, jsonData)
+				conn.Publish(ctx, key, jsonData)
 			}
 			continue
 		}
@@ -134,7 +134,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 			fmt.Println(err)
 			return
 		}
-		// Conn.publish(ctx, serverId, jsonData)
+		Conn.publish(ctx, serverId, jsonData)
 	}
 
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "connection closing")
