@@ -53,7 +53,6 @@ func WSHandler(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	// upgrades to a websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
-	//
 	if err != nil {
 		fmt.Printf("Failed to upgrade: %+v", err)
 		return
@@ -134,7 +133,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 			fmt.Println(err)
 			return
 		}
-		Conn.publish(ctx, serverId, jsonData)
+		conn.publish(ctx, serverId, jsonData)
 	}
 
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "connection closing")
