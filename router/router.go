@@ -14,6 +14,13 @@ func Start() {
 	router := gin.Default()
 	database.SetupConnection()
 
+	/**
+	sets redis client, establishing connection to a redis db
+	starts new goroutine, PubSub() will run concurrently with main goroutine -> subscribe to redis client and continously handles publishing messages to a Pub/Sub system in a separate goroutine
+	start another goroutine, Send() -> gets msg from broadcast channel and processes it, message -> process -> get receiver -> receiver conn -> send private OR group message
+	config.PubSub() receiving data and config.Send() processing and distributing it
+
+	*/
 	config.NPool()
 	go config.PubSub()
 	go config.Send()

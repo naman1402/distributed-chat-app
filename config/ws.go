@@ -123,7 +123,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 				}
 				fmt.Println("redis key ", key)
 				conn.Publish(ctx, key, jsonData)
-			}
+			}x
 			continue
 		}
 		controller.SaveMessagePrivateChat(res.Id, res.Message, res.Sender, res.Receiver)
