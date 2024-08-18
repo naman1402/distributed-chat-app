@@ -8,7 +8,7 @@ import (
 )
 
 var ctx = context.Background()
-var conn redis.Client
+var Conn redis.Client
 
 // manages websocket connections, connection lifecycle
 // Ping is used for connection check
@@ -23,18 +23,18 @@ func NPool() {
 	if err != nil {
 		panic(err)
 	}
-	conn = *rdb
+	Conn = *rdb
 }
 
 // creates channel for individual chats and group chats
 // subscribes to channel identified by serverid using client conn and ctx background connection
-// subscriber is redis.PubSub
+// subscriber is redis.PubSub !!!!!
 // in infinite loop, continously listens for message on sub
 // if message is received, add it to broadcast channel + error handling
 func PubSub() {
 	SERVERID := ""
 	fmt.Println(SERVERID)
-	subscriber := conn.Subscribe(ctx, SERVERID)
+	subscriber := Conn.Subscribe(ctx, SERVERID)
 	for {
 		msg, err := subscriber.ReceiveMessage(ctx)
 		if err != nil {

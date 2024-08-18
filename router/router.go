@@ -21,9 +21,9 @@ func Start() {
 	config.PubSub() receiving data and config.Send() processing and distributing it
 
 	*/
-	config.NPool()
-	go config.PubSub()
-	go config.Send()
+	config.NPool()     // create the redis.Client
+	go config.PubSub() // receive message from pub sub and adds to broadcast channel
+	go config.Send()   // gets message from broadcast channel, processes it and further sends it
 
 	router.GET("/", home)
 	router.POST("/create", controller.CreateRoom)

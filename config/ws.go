@@ -122,8 +122,8 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 					return
 				}
 				fmt.Println("redis key ", key)
-				conn.Publish(ctx, key, jsonData)
-			}x
+				Conn.Publish(ctx, key, jsonData)
+			}
 			continue
 		}
 		controller.SaveMessagePrivateChat(res.Id, res.Message, res.Sender, res.Receiver)
@@ -133,7 +133,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 			fmt.Println(err)
 			return
 		}
-		conn.publish(ctx, serverId, jsonData)
+		Conn.Publish(ctx, serverId, jsonData)
 	}
 
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "connection closing")
