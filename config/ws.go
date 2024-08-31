@@ -199,7 +199,7 @@ func groupMessage(message Message) {
 		res.Sender = message.Sender
 		res.Message = message.Message
 		res.Group = message.Group
-		res.GroupName = res.GroupName
+		res.GroupName = message.GroupName
 		data, err := json.Marshal(res)
 		if err != nil {
 			fmt.Println(err)
