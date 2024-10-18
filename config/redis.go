@@ -7,11 +7,15 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// ctx is global context, Conn is redis Client used to connect and interact with the Redis server
 var ctx = context.Background()
 var Conn redis.Client
 
-// manages websocket connections, connection lifecycle
-// Ping is used for connection check
+// var broadcast chan *redis.Message
+
+// Redis setup function, initialise new Redis Client and connect it with redis server
+// pinging the connection to ensure the connectivity,
+// if connection is successful, set the global variable as the newly initiliased client
 func NPool() {
 
 	rdb := redis.NewClient(&redis.Options{
@@ -19,18 +23,15 @@ func NPool() {
 		Password: "",
 		DB:       0,
 	})
-	_, err := rdb.Ping(context.Background()).Result()
+	_, err := rdb.Ping(ctx).Result()
 	if err != nil {
 		panic(err)
 	}
 	Conn = *rdb
 }
 
-// creates channel for individual chats and group chats
-// subscribes to channel identified by serverid using client conn and ctx background connection
-// subscriber is redis.PubSub !!!!!
-// in infinite loop, continously listens for message on sub
-// if message is received, add it to broadcast channel + error handling
+// subscribing to the channel with ID using redis client, if successful subscriber will receive message published to that channel
+// message received is stored in msg, and passed to the broadcast channel (redis.Message)
 func PubSub() {
 	SERVERID := ""
 	fmt.Println(SERVERID)

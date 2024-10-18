@@ -10,6 +10,8 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// context holds information about the upcoming HTTP request and provides method to handle the response
+// storing the context into newRoom (JSON format) and inserting into cassandra session by calling execute query from database package
 func CreateRoom(c *gin.Context) {
 	newRoom := model.Room{}
 	if err := c.ShouldBindBodyWithJSON(&newRoom); err != nil {
@@ -21,6 +23,7 @@ func CreateRoom(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "done"})
 }
 
+// get room from context and execute query to add member into room_name (room and user name from context -> joiningRoom)
 func JoinRoom(c *gin.Context) {
 	joiningRoom := model.Room{}
 	if err := c.ShouldBindBodyWithJSON(&joiningRoom); err != nil {
@@ -31,6 +34,9 @@ func JoinRoom(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "room joined"})
 }
 
+// data is iterator containing room members (collected by calling query directly through cassandra session)
+// in the for loop, we scan username from data and store it into members ([]string)
+// return the array containing members
 func GetMembersFromRoom(groupname string) []string {
 	var username string
 	members := []string{}

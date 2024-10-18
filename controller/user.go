@@ -23,11 +23,14 @@ func CreateUser(c *gin.Context) {
 
 func LoginUser(c *gin.Context) {
 
+	// get user from context to know about the account details
 	user := &model.LoginReq{}
 	if err := c.ShouldBindJSON(&user); err != nil {
 		fmt.Println(err)
 	}
-
+	// search for the account detail in db, and use database package function to check if user exist (using query)
+	// if ID is "", then it does not exist and return bad request http status
+	// else setcookies for successful login
 	query := `SELECT id, username FROM users WHERE username = ?`
 	ID, username := database.CheckIfExist(query, user.Id)
 	if ID == "" {

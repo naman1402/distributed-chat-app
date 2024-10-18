@@ -31,22 +31,18 @@ type ErrMessage struct {
 	Message string `json:"message"`
 }
 
-var broadcast = make(chan *redis.Message)      // channel to receive message from channel
+var broadcast = make(chan *redis.Message)      // channel to receive message
 var clients = make(map[string]*websocket.Conn) // userid to websocket connection
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-}
-var SERVERID string = ""
+}                        // converts HTTP connections into Websocket connections
+var SERVERID string = "" // Serverid used for redis pubsub connection
 
 /*
-*
-w = websocket response, r = http request and c is gin context information
-getting id from incoming request using gin method
-disable origin checking for websocket connection (testing purposes only)
-upgrading http connection to websocket connection (conn) and error handling
-checking if user of userid exist, if not then close ws connection
-if it exists (user) then calls the NewClient and ReceiveMessage function
+* gets userid from context, allows connections from any origin and upgrading http connection to a websocket connection, return websocket.Conn
+check error in upgrading, getting username of id from controller. If username is empty then close websocket connection
+Register new client (id) and their websocket connection (conn) and Listens to upcoming websocket messagess
 */
 func WSHandler(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 	userId := c.Query("id")
@@ -69,16 +65,12 @@ func WSHandler(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 
 /*
 *
-handles incoming messages on websocket connection (conn)
-in infinite loop, gets msg from conn.ReadMessage() and converts into json form in `res`
-setting attribute of res (Message), and validate
-if validation failed, convert err into json (MARSHAL) and send it back to the client using conn
-if res.Group is true, then saves message in db using SaveMessageGroupChat
-then get members of group in `members`, and store their respective serverid in `servers`
-for each member, get serverid and store in mapping
-iterates over servers loop, set res.ServerId to current id (key) and modifies res object back into json
-after loop, processes it as private chat, saves in db,
-REDIS ??????????????
+Listens to incoming websocket messages
+reading messages from the websocket connection and check for errors
+convert msg json into res Message using Unmarshal and check for errors
+create new id and keep res.Id as the string form of this id, set sender as userID
+if group of res exists then
+send through private chat
 */
 func ReceiveMessage(conn *websocket.Conn, userID string) {
 
@@ -104,6 +96,9 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 			continue
 		}
 
+		// saves the message in db and get members of the groupname
+		// for all members stored their serverid to member mapping
+		// using loop, iterate through all servers and publish the message on redis client
 		if res.Group {
 			controller.SaveMessageGroupChat(res.Id, res.Message, res.Sender, res.GroupName)
 			members := controller.GetMembersFromRoom(res.GroupName)
@@ -122,10 +117,16 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 					return
 				}
 				fmt.Println("redis key ", key)
+				//////////////////////////////////////////////////////
+				// used to send messages to a specified Redis channel//
+				/////////////////////////////////////////////////////
+				// ctx is the context for the operaion, key is the name of Redis channel(serverid) to which the message will be published
+				// jsonData is message we want to send
 				Conn.Publish(ctx, key, jsonData)
 			}
 			continue
 		}
+		// logic to execute private chat, publishing message on redis Client
 		controller.SaveMessagePrivateChat(res.Id, res.Message, res.Sender, res.Receiver)
 		serverId := controller.GetServerId(res.Receiver)
 		jsonData, err := json.Marshal(res)
@@ -141,6 +142,7 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 		fmt.Println(err)
 		return
 	}
+	// closing websocket connection
 	conn.Close()
 }
 
@@ -205,6 +207,7 @@ func groupMessage(message Message) {
 			fmt.Println(err)
 			return
 		}
+		// send message using websocket connection
 		err = client.WriteMessage(websocket.TextMessage, []byte(data))
 		if err != nil {
 			delete(clients, message.Receiver)
@@ -223,6 +226,7 @@ func privateMessage(message Message, client *websocket.Conn) {
 		fmt.Println(err)
 		return
 	}
+	// TO WRITE MESSAGE we send message using websocket connection
 	err = client.WriteMessage(websocket.TextMessage, []byte(jsonData))
 	if err != nil {
 		delete(clients, message.Receiver)
