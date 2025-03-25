@@ -4,7 +4,7 @@ services:
     container_name: testCass
     image: cassandra:4.0
     ports:
-      - 9042:9042
+      - ${CASSANDRA_PORT}:9042
     networks:
       - go_net
     volumes:
@@ -15,18 +15,20 @@ services:
     container_name: redis_chat_app
     image: "redis:7.0.2"
     ports:
-      - 6379:6379
+      - ${REDIS_PORT}:6379
     networks:
       - go_net
   api1:
     container_name: go_chat_1
     build: .
+    expose:
+      - "${API1_PORT}"
     ports:
-      - 6300:6300
+      - "${API1_PORT}:${API1_PORT}"
     restart: always
     environment:
       SERVERID: "SERVER1"
-      PORT: "6300"
+      PORT: "${API1_PORT}"
     depends_on:
       - redis
       - cassandra
@@ -35,12 +37,14 @@ services:
   api2:
     container_name: go_chat_2
     build: .
+    expose:
+      - "${API2_PORT}"
     ports:
-      - 6400:6400
+      - "${API2_PORT}:${API2_PORT}"
     restart: always
     environment:
       SERVERID: "SERVER2"
-      PORT: "6400"
+      PORT: "${API2_PORT}"
     depends_on:
       - redis
       - cassandra
@@ -49,12 +53,14 @@ services:
   api3:
     container_name: go_chat_3
     build: .
+    expose:
+      - "${API3_PORT}"
     ports:
-      - 6500:6500
+      - "${API3_PORT}:${API3_PORT}"
     restart: always
     environment:
       SERVERID: "SERVER3"
-      PORT: "6500"
+      PORT: "${API3_PORT}"
     depends_on:
       - redis
       - cassandra
@@ -66,7 +72,7 @@ services:
     build: 
       context: ./nginx
     ports:
-      - 80:80
+      - ${NGINX_PORT}:80
     depends_on:
       - api1
       - api2

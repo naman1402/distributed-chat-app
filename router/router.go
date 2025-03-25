@@ -1,7 +1,9 @@
 package router
 
 import (
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naman1402/distributed-chat-app/config"
@@ -12,6 +14,10 @@ import (
 func Start() {
 
 	router := gin.Default()
+
+	// Add logging middleware
+	router.Use(gin.Logger())
+
 	database.SetupConnection()
 
 	/**
@@ -25,12 +31,26 @@ func Start() {
 	go config.PubSub() // receive message from pub sub and adds to broadcast channel
 	go config.Send()   // gets message from broadcast channel, processes it and further sends it
 
+	// Add health check endpoint
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	router.GET("/", home)
 	router.POST("/create", controller.CreateRoom)
 	router.POST("/join", controller.JoinRoom)
 	router.POST("/signin", controller.CreateUser)
 	router.POST("/login", controller.LoginUser)
-	router.Run(":" + "3000")
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		log.Fatal("PORT environment variable is required")
+	}
+
+	log.Printf("Server starting on port: %s", port)
+	if err := router.Run("0.0.0.0:" + port); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
 
 func home(c *gin.Context) {
