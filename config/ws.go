@@ -1,3 +1,5 @@
+// Package config implements WebSocket handling for a distributed chat system
+// It manages real-time message distribution across multiple server instances using Redis pub/sub
 package config
 
 import (
@@ -15,6 +17,15 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// Message defines the structure for chat messages with support for both private and group communications
+// Id: Unique message identifier generated using KSUID
+// Message: The actual message content
+// Sender: UserID of message sender
+// Receiver: UserID of recipient (for private messages)
+// Group: Flag indicating if message is for group chat
+// GroupName: Name of the group for group messages
+// GroupMembers: List of users in the group
+// ServerId: ID of server handling the message
 type Message struct {
 	Id           string
 	Message      string   `json:"msg"`
@@ -26,24 +37,40 @@ type Message struct {
 	ServerId     string   `json:"server_id,omitempty"`
 }
 
+// ErrMessage defines the structure for error messages
 type ErrMessage struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 }
 
-var broadcast = make(chan *redis.Message)      // channel to receive message
-var clients = make(map[string]*websocket.Conn) // userid to websocket connection
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}                        // converts HTTP connections into Websocket connections
-var SERVERID string = "" // Serverid used for redis pubsub connection
+// Global connection management variables
+var (
+	// broadcast acts as a message queue for Redis pub/sub messages
+	broadcast = make(chan *redis.Message)
 
-/*
-* gets userid from context, allows connections from any origin and upgrading http connection to a websocket connection, return websocket.Conn
-check error in upgrading, getting username of id from controller. If username is empty then close websocket connection
-Register new client (id) and their websocket connection (conn) and Listens to upcoming websocket messagess
-*/
+	// clients maintains mapping of active user connections
+	// key: userId, value: websocket connection
+	clients = make(map[string]*websocket.Conn)
+
+	// upgrader configures WebSocket connection parameters
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	// SERVERID uniquely identifies this server instance in the distributed system
+	SERVERID string = ""
+)
+
+// WSHandler establishes and manages WebSocket connections
+// 1. Extracts user ID from request
+// 2. Upgrades HTTP connection to WebSocket
+// 3. Validates user authentication
+// 4. Initializes client connection
+// Parameters:
+//   - w: HTTP response writer
+//   - r: HTTP request
+//   - c: Gin context containing user information
 func WSHandler(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 	userId := c.Query("id")
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -58,20 +85,19 @@ func WSHandler(w http.ResponseWriter, r *http.Request, c *gin.Context) {
 		CloseWS("Authentication failed - invalid username", conn)
 		return
 	}
-
+	// Initializes client connection
 	NewClient(userId, conn)
 	ReceiveMessage(conn, userId)
 }
 
-/*
-*
-Listens to incoming websocket messages
-reading messages from the websocket connection and check for errors
-convert msg json into res Message using Unmarshal and check for errors
-create new id and keep res.Id as the string form of this id, set sender as userID
-if group of res exists then
-send through private chat
-*/
+// ReceiveMessage processes incoming WebSocket messages
+// Implementation:
+// 1. Continuously reads messages from WebSocket
+// 2. Deserializes JSON messages
+// 3. Validates message content
+// 4. Routes messages to appropriate handlers (group/private)
+// 5. Persists messages to database
+// 6. Publishes to Redis for cross-server communication
 func ReceiveMessage(conn *websocket.Conn, userID string) {
 
 	for {
@@ -147,6 +173,10 @@ func ReceiveMessage(conn *websocket.Conn, userID string) {
 }
 
 // stores the user in db, id -> conn mapping, sends ack message ok to newly connected client
+// NewClient registers a new WebSocket client connection
+// 1. Records user-server mapping in database
+// 2. Stores WebSocket connection in memory
+// 3. Sends connection acknowledgment
 func NewClient(userId string, conn *websocket.Conn) {
 
 	controller.SetUser(userId, SERVERID)
@@ -161,12 +191,18 @@ if group exist, call groupMessage function, if not group then private message
 get conn of receiver of message, it conn is nil then receiver is offline
 send private message(json) to recevier conn
 */
+// Send implements the message distribution system
+// 1. Listens to Redis broadcast channel
+// 2. Deserializes incoming messages
+// 3. Routes to group/private message handlers
+// 4. Handles offline user scenarios
 func Send() {
 	for {
 
 		msg := <-broadcast
 		message := Message{}
-		if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
+		err := json.Unmarshal([]byte(msg.Payload), &message)
+		if err != nil {
 			panic(err)
 		}
 		if message.Group {
@@ -188,6 +224,11 @@ declares empty message, loop for all member. get their connection (client) and c
 sets attributes of response message, use marshal to convert res into json data and sends using client(conn).WriteMessage to member
 after sending, remove receiver from clients and close respective connection
 */
+// groupMessage implements group chat message distribution
+// 1. Creates a new message instance for each recipient
+// 2. Checks recipient connection status
+// 3. Delivers message to all online group members
+// 4. Handles connection failures and cleanup
 func groupMessage(message Message) {
 	res := Message{}
 	for _, member := range message.GroupMembers {
@@ -220,6 +261,10 @@ func groupMessage(message Message) {
 *
 directly to specific user, marshal data into jsonData and send using client.WriteMessage()
 */
+// privateMessage handles one-to-one message delivery
+// 1. Serializes message to JSON
+// 2. Delivers to recipient's WebSocket connection
+// 3. Handles connection errors and cleanup
 func privateMessage(message Message, client *websocket.Conn) {
 	jsonData, err := json.Marshal(message)
 	if err != nil {
@@ -234,6 +279,8 @@ func privateMessage(message Message, client *websocket.Conn) {
 	}
 }
 
+// CloseWS performs graceful WebSocket connection termination
+// Sends close frame with custom message before closing
 func CloseWS(msg string, conn *websocket.Conn) {
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, msg)
 	if err := conn.WriteMessage(websocket.CloseMessage, cm); err != nil {
@@ -243,6 +290,8 @@ func CloseWS(msg string, conn *websocket.Conn) {
 	conn.Close()
 }
 
+// MsgFailed notifies client of message delivery failure
+// Sends standardized error JSON response
 func MsgFailed(conn *websocket.Conn) {
 
 	msg := `{"message": "Failed to send message"}`
@@ -252,6 +301,11 @@ func MsgFailed(conn *websocket.Conn) {
 	}
 }
 
+// Validate implements message validation rules
+// Validates:
+// - Message content: Required, non-empty, length 1-1000 chars
+// - Group flag: Must be non-nil
+// - Group name: Length 1-25 chars when present
 func (m Message) Validate() error {
 	return validation.ValidateStruct(&m,
 		validation.Field(&m.Message,
